@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: udh-pipeline
+data:
+  my_custom.cnf: |
+    [mysqld]
+    user=mysql
+    slow_query_log=1
+    long_query_time=2
+    # you can add more tuning settings here
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: udh-pipeline
+spec:
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: udh-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      securityContext:
+        runAsUser: 1001  # Ensures MySQL runs with the correct user
+        fsGroup: 1001    # Ensures file system permissions are correct
+      initContainers:
+        - name: copy-config
+          image: busybox
+          command: ['sh', '-c', 'cp /config/my_custom.cnf /opt/bitnami/mysql/conf/']
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+            - name: mysql-config-volume
+              mountPath: /opt/bitnami/mysql/conf
+      containers:
+        - name: mysql
+          image: bitnami/mysql:latest
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "rootpass"
+            - name: MYSQL_DATABASE
+              value: "mysqldb"
+            - name: MYSQL_USER
+              value: "mysqluser"
+            - name: MYSQL_PASSWORD
+              value: "mysqlpass"
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-config-volume
+              mountPath: /opt/bitnami/mysql/conf
+            - name: mysql-data
+              mountPath: /bitnami/mysql
+      volumes:
+        - name: config-volume
+          configMap:
+            name: mysql-config
+        - name: mysql-config-volume
+          emptyDir: {}
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: udh-pipeline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: longhorn
+

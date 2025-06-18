@@ -1,0 +1,23 @@
+
+defaultSettings:
+  defaultDataPath: "/var/lib/longhorn"
+  replicaSoftAntiAffinity: true
+  createDefaultDiskLabeledNodes: true
+  defaultReplicaCount: 2
+  storageOverProvisioningPercentage: 200
+  storageMinimalAvailablePercentage: 10
+  defaultLonghornStaticStorageClass: longhorn-static
+
+persistence:
+  defaultClass: true
+  defaultClassReplicaCount: 2
+  reclaimPolicy: Retain
+
+ingress:
+  enabled: false
+
+service:
+  ui:
+    type: NodePort  # or ClusterIP / LoadBalancer
+
+

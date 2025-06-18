@@ -1,0 +1,204 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: airflow
+  namespace: udh-pipeline
+spec:
+  serviceName: "airflow"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow
+  template:
+    metadata:
+      labels:
+        app: airflow
+    spec:
+      securityContext:     # ✅ <--- Correct location
+        fsGroup: 5000
+      initContainers:
+        - name: fix-permissions
+          image: apache/airflow:2.8.1-python3.10
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Skipping chown... trusting fsGroup"
+
+          volumeMounts:
+            - name: jdk
+              mountPath: /opt/jdk
+            - name: pythonlib
+              mountPath: /opt/pythonlib
+            - name: config
+              mountPath: /opt/airflow/config
+            - name: plugins
+              mountPath: /opt/airflow-plugins
+            - name: data
+              mountPath: /opt/airflow/data
+        - name: db-migrate
+          image: apache/airflow:2.8.1-python3.10
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              airflow db migrate 
+
+          resources:
+            requests:
+              memory: "2Gi"
+            limits:
+              memory: "4Gi"
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: jdk
+              mountPath: /opt/jdk
+            - name: pythonlib
+              mountPath: /opt/pythonlib
+            - name: config
+              mountPath: /opt/airflow/config
+            - name: plugins
+              mountPath: /opt/airflow-plugins
+            - name: data
+              mountPath: /opt/airflow/data
+
+      containers:
+        - name: airflow-webserver
+          image: apache/airflow:2.8.1-python3.10
+          command: ["airflow", "webserver"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflowuser:airflowpass@postgres-proxy:5432/airflowdb2
+            - name: AIRFLOW__WEBSERVER__RBAC
+              value: "True"
+            - name: AIRFLOW__WEBSERVER__AUTHENTICATE
+              value: "True"
+            - name: AIRFLOW__WEBSERVER__AUTH_BACKEND
+              value: "airflow.www.security.manager.AuthManager"
+            - name: PYTHONLIB
+              value: /opt/pythonlib
+            - name: JAVA_HOME
+              value: /opt/jdk/openjdk-17
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: jdk
+              mountPath: /opt/jdk
+            - name: pythonlib
+              mountPath: /opt/pythonlib
+            - name: config
+              mountPath: /opt/airflow/config
+            - name: plugins
+              mountPath: /opt/airflow-plugins
+            - name: data
+              mountPath: /opt/airflow/data
+
+        - name: airflow-scheduler
+          image: apache/airflow:2.8.1-python3.10
+          command: ["airflow", "scheduler"]
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: postgresql+psycopg2://airflowuser:airflowpass@postgres-proxy:5432/airflowdb2
+
+            - name: PYTHONLIB
+              value: /opt/pythonlib
+            - name: JAVA_HOME
+              value: /opt/jdk/openjdk-17
+          volumeMounts:
+            - name: dags
+              mountPath: /opt/airflow/dags
+            - name: logs
+              mountPath: /opt/airflow/logs
+            - name: jdk
+              mountPath: /opt/jdk
+            - name: pythonlib
+              mountPath: /opt/pythonlib
+            - name: config
+              mountPath: /opt/airflow/config
+            - name: plugins
+              mountPath: /opt/airflow-plugins
+            - name: data
+              mountPath: /opt/airflow/data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: dags
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: logs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: jdk
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: pythonlib
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: config
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: plugins
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-web
+  namespace: udh-pipeline
+spec:
+  type: NodePort
+  selector:
+    app: airflow
+  ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+      nodePort: 30088
+

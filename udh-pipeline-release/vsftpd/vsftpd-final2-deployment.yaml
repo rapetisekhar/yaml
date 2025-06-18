@@ -1,0 +1,135 @@
+# ConfigMap for environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vsftpd-env
+  namespace: udh-pipeline
+data:
+  FTP_USER: testuser
+  FTP_PASS: testpass
+  PASV_MIN_PORT: "21100"
+  PASV_MAX_PORT: "21110"
+---
+# Deployment for vsftpd
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vsftpd
+  namespace: udh-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vsftpd
+  template:
+    metadata:
+      labels:
+        app: vsftpd
+    spec:
+      containers:
+        - name: vsftpd
+          image: fauria/vsftpd
+          ports:
+            - name: ftp
+              containerPort: 21
+              protocol: TCP
+            - containerPort: 21100
+              protocol: TCP
+            - containerPort: 21101
+              protocol: TCP
+            - containerPort: 21102
+              protocol: TCP
+            - containerPort: 21103
+              protocol: TCP
+            - containerPort: 21104
+              protocol: TCP
+            - containerPort: 21105
+              protocol: TCP
+            - containerPort: 21106
+              protocol: TCP
+            - containerPort: 21107
+              protocol: TCP
+            - containerPort: 21108
+              protocol: TCP
+            - containerPort: 21109
+              protocol: TCP
+            - containerPort: 21110
+              protocol: TCP
+          env:
+            - name: PASV_ADDRESS
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          envFrom:
+            - configMapRef:
+                name: vsftpd-env
+          volumeMounts:
+            - name: ftp-data
+              mountPath: /home/vsftpd
+
+      volumes:
+        - name: ftp-data
+          persistentVolumeClaim:
+            claimName: ftp-pvc
+---
+# NodePort Service exposing all PASV ports
+apiVersion: v1
+kind: Service
+metadata:
+  name: vsftpd
+  namespace: udh-pipeline
+spec:
+  type: NodePort
+  selector:
+    app: vsftpd
+  ports:
+    - name: ftp
+      port: 21
+      targetPort: 21
+      nodePort: 30021
+      protocol: TCP
+    - name: pasv-21100
+      port: 21100
+      targetPort: 21100
+      nodePort: 30200
+    - name: pasv-21101
+      port: 21101
+      targetPort: 21101
+      nodePort: 30201
+    - name: pasv-21102
+      port: 21102
+      targetPort: 21102
+      nodePort: 30202
+    - name: pasv-21103
+      port: 21103
+      targetPort: 21103
+      nodePort: 30203
+    - name: pasv-21104
+      port: 21104
+      targetPort: 21104
+      nodePort: 30204
+    - name: pasv-21105
+      port: 21105
+      targetPort: 21105
+      nodePort: 30205
+    - name: pasv-21106
+      port: 21106
+      targetPort: 21106
+      nodePort: 30206
+    - name: pasv-21107
+      port: 21107
+      targetPort: 21107
+      nodePort: 30207
+    - name: pasv-21108
+      port: 21108
+      targetPort: 21108
+      nodePort: 30208
+    - name: pasv-21109
+      port: 21109
+      targetPort: 21109
+      nodePort: 30209
+    - name: pasv-21110
+      port: 21110
+      targetPort: 21110
+      nodePort: 30210
+

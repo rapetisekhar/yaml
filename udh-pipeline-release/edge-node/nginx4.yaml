@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: udh-pipeline
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name localhost;
+
+      location / {
+          root /usr/share/nginx/html;
+          index index.html index.htm;
+      }
+
+      location /airflow-dags/ {
+          alias /opt/airflow-dags/;
+          autoindex on;
+      }
+      location /airflow-jdk/ {
+          alias /opt/airflow-jdk/;
+          autoindex on;
+      }
+      location /airflow-logs/ {
+          alias /opt/airflow-logs/;
+          autoindex on;
+      }
+      location /airflow-pythonlib/ {
+          alias /opt/airflow-pythonlib/;
+          autoindex on;
+      }
+      location /superset/ {
+          alias /opt/superset/;
+          autoindex on;
+      }
+      location /trino-data/ {
+          alias /opt/trino-data/;
+          autoindex on;
+      }
+      location /hive-extra-lib/ {
+          alias /opt/hive-extra-lib/;
+          autoindex on;
+      }
+      location /jdk/ {
+          alias /opt/jdk/;
+          autoindex on;
+      }
+      location /pythonlib/ {
+          alias /opt/pythonlib/;
+          autoindex on;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-access-airflow-superset
+  namespace: udh-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-access-airflow-superset
+  template:
+    metadata:
+      labels:
+        app: nginx-access-airflow-superset
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+          env:
+            - name: JAVA_HOME
+              value: /opt/jdk/jdk-24
+            - name: PYTHONLIB
+              value: /opt/pythonlib
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+            - name: airflow-dags
+              mountPath: /opt/airflow-dags
+            - name: airflow-jdk
+              mountPath: /opt/airflow-jdk
+            - name: airflow-logs
+              mountPath: /opt/airflow-logs
+            - name: airflow-pythonlib
+              mountPath: /opt/airflow-pythonlib
+            - name: hive-extra-lib
+              mountPath: /opt/hive-extra-lib
+            - name: superset-data
+              mountPath: /opt/superset
+            - name: trino-data
+              mountPath: /opt/trino-data
+            - name: jdk
+              mountPath: /opt/jdk
+            - name: pythonlib
+              mountPath: /opt/pythonlib
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+        - name: airflow-dags
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-airflow-dags-pvc-pvc-dd8cd9a6-5887-4c3c-9408-02103437bef1
+            type: DirectoryOrCreate
+        - name: airflow-jdk
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-jdk-airflow-0-pvc-fb881f1d-06cc-40cc-984e-d1595dd9098d
+            type: DirectoryOrCreate
+        - name: airflow-logs
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-airflow-logs-pvc-pvc-4ed4e2fd-14ed-46c8-a98c-4422854d49e8
+            type: DirectoryOrCreate
+        - name: airflow-pythonlib
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-pythonlib-airflow-0-pvc-6f87f465-1149-40cf-8269-3485145d70a0
+            type: DirectoryOrCreate
+        - name: superset-data
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-superset-data-superset-0-pvc-469801f4-0b29-4c78-b65b-8b9ac49c4e22
+            type: DirectoryOrCreate
+        - name: trino-data
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-trino-data-trino-statefulset-0-pvc-6a5b921a-862b-4a86-a969-27409e188208
+            type: DirectoryOrCreate
+        - name: hive-extra-lib
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-hive-extra-lib-pvc-pvc-bd401060-72f9-46e6-a0bf-859431144e19
+            type: DirectoryOrCreate
+        - name: jdk
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-jdk-airflow-0-pvc-fb881f1d-06cc-40cc-984e-d1595dd9098d
+            type: DirectoryOrCreate
+        - name: pythonlib
+          hostPath:
+            path: /var/snap/microk8s/common/default-storage/udh-pipeline-pythonlib-airflow-0-pvc-6f87f465-1149-40cf-8269-3485145d70a0
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-access-airflow-superset-service
+  namespace: udh-pipeline
+spec:
+  type: NodePort
+  selector:
+    app: nginx-access-airflow-superset
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30025
+

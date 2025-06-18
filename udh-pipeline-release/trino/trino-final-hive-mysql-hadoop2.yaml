@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-config
+  namespace: udh-pipeline
+data:
+  config.properties: |
+    node.environment=production
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    query.max-memory=512MB
+    query.max-memory-per-node=256MB
+    discovery-server.enabled=true
+    discovery.uri=http://localhost:8080
+  jvm.config: |
+    -server
+    -Xmx1G
+    -XX:+UseG1GC
+    -XX:+UseGCOverheadLimit
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:+ExitOnOutOfMemoryError
+    -Djava.util.logging.config.file=/etc/trino/log.properties
+  log.properties: |
+    com.facebook.presto=INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-hive-catalog
+  namespace: udh-pipeline
+data:
+  hive.properties: |
+    connector.name=hive-hadoop2
+    hive.metastore.uri=thrift://hive-metastore.udh-pipeline.svc.cluster.local:9083
+    hive.s3.aws-access-key=minio
+    hive.s3.aws-secret-key=minio123
+    hive.s3.endpoint=http://minio-service.udh-pipeline.svc.cluster.local:9000
+    hive.s3.path-style-access=true
+    hive.s3.ssl.enabled=false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trino
+  namespace: udh-pipeline
+  labels:
+    app: trino
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trino
+  template:
+    metadata:
+      labels:
+        app: trino
+    spec:
+      containers:
+        - name: trino
+          image: trinodb/trino:351
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: trino-config
+              mountPath: /etc/trino/config.properties
+              subPath: config.properties
+              readOnly: true
+            - name: trino-config
+              mountPath: /etc/trino/jvm.config
+              subPath: jvm.config
+              readOnly: true
+            - name: trino-config
+              mountPath: /etc/trino/log.properties
+              subPath: log.properties
+              readOnly: true
+            - name: hive-catalog
+              mountPath: /etc/trino/catalog/hive.properties
+              subPath: hive.properties
+              readOnly: true
+      volumes:
+        - name: trino-config
+          configMap:
+            name: trino-config
+        - name: hive-catalog
+          configMap:
+            name: trino-hive-catalog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trino
+  namespace: udh-pipeline
+spec:
+  selector:
+    app: trino
+  ports:
+    - port: 8080
+      targetPort: 8080
+

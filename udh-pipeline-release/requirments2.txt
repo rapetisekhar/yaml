@@ -1,0 +1,30 @@
+# Base Airflow
+apache-airflow
+
+# Providers
+apache-airflow-providers-common-sql
+apache-airflow-providers-common-messaging
+apache-airflow-providers-standard
+apache-airflow-providers-snowflake
+apache-airflow-providers-apache-spark
+apache-airflow-providers-apache-kafka
+apache-airflow-providers-slack
+
+# Snowflake connector
+snowflake-connector-python>=3.4.0,<4.0.0
+pyarrow<19.0.0
+
+# Big data & streaming
+pyspark>=3.5.0
+kafka-python==2.0.2
+confluent-kafka
+
+# Storage clients
+minio==7.0.0
+boto3
+
+# Miscellaneous tools
+python-dotenv
+asn1tools
+slack-sdk
+trino

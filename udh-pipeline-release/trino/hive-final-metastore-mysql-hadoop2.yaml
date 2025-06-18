@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hive-metastore
+  namespace: udh-pipeline
+  labels:
+    app: hive-metastore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hive-metastore
+  template:
+    metadata:
+      labels:
+        app: hive-metastore
+    spec:
+      containers:
+        - name: hive-metastore
+          image: bitsondatadev/hive-metastore:latest
+          ports:
+            - containerPort: 9083
+          env:
+            - name: METASTORE_DB_HOSTNAME
+              value: mysql
+            - name: METASTORE_TYPE
+              value: mysql
+            - name: METASTORE_DB_PORT
+              value: "3306"
+
+          volumeMounts:
+            - name: hive-site-xml
+              mountPath: /opt/apache-hive-metastore-3.0.0-bin/conf/hive-site.xml
+              subPath: hive-site.xml
+              readOnly: true
+            - name: extra-lib
+              mountPath: /opt/extra-lib
+      volumes:
+        - name: hive-site-xml
+          configMap:
+            name: hive-metastore-config
+        - name: extra-lib
+          persistentVolumeClaim:
+            claimName: hive-extra-lib-pvc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hive-metastore-config
+  namespace: udh-pipeline
+data:
+  hive-site.xml: |
+    <configuration>
+
+    <property>
+        <name>metastore.thrift.uris</name>
+        <value>thrift://hive-metastore:9083</value>
+        <description>Thrift URI for the remote metastore. Used by metastore client to connect to remote metastore.</description>
+    </property>
+    <property>
+        <name>metastore.task.threads.always</name>
+        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask,org.apache.hadoop.hive.metastore.MaterializationsCacheCleanerTask</value>
+    </property>
+    <property>
+        <name>metastore.expression.proxy</name>
+        <value>org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy</value>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionDriverName</name>
+        <value>com.mysql.jdbc.Driver</value>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionURL</name>
+        <value>jdbc:mysql://mysql:3306/metastore_db</value>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionUserName</name>
+        <value>admin</value>
+    </property>
+    <property>
+        <name>javax.jdo.option.ConnectionPassword</name>
+        <value>admin</value>
+    </property>
+
+      <!-- S3 (MinIO) for warehouse directory -->
+      <property>
+        <name>metastore.warehouse.dir</name>
+        <value>s3a://hive/warehouse2</value>
+      </property>
+
+      <!-- Schema initialization behavior -->
+      <property>
+        <name>hive.metastore.schema.verification</name>
+        <value>false</value>
+      </property>
+
+      <!-- Datanucleus -->
+      <property>
+        <name>datanucleus.autoCreateSchema</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>datanucleus.fixedDatastore</name>
+        <value>false</value>
+      </property>
+      <property>
+        <name>datanucleus.autoCreateTables</name>
+        <value>true</value>
+      </property>
+
+      <!-- MinIO S3A support -->
+      <property>
+        <name>fs.s3a.endpoint</name>
+        <value>http://minio-service.udh-pipeline.svc.cluster.local:9000</value>
+      </property>
+      <property>
+        <name>fs.s3a.access.key</name>
+        <value>minio</value>
+      </property>
+      <property>
+        <name>fs.s3a.secret.key</name>
+        <value>minio123</value>
+      </property>
+      <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>true</value>
+      </property>
+      <property>
+        <name>fs.s3a.connection.ssl.enabled</name>
+        <value>false</value>
+      </property>
+    </configuration>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hive-metastore
+  namespace: udh-pipeline
+spec:
+  selector:
+    app: hive-metastore
+  ports:
+    - port: 9083
+      targetPort: 9083
+

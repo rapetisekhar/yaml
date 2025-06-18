@@ -1,0 +1,34 @@
+- name: PYTHONLIB
+  value: /opt/pythonlib
+- name: JAVA_HOME
+  value: /opt/jdk/openjdk-17
+
+volumeMounts:
+  - name: dags
+    mountPath: /opt/airflow/dags
+  - name: logs
+    mountPath: /opt/airflow/logs
+  - name: jdk
+    mountPath: /opt/jdk
+  - name: pythonlib
+    mountPath: /opt/pythonlib
+  - name: config
+    mountPath: /opt/airflow/config
+  - name: data
+    mountPath: /opt/airflow/data
+  - name: extra-lib
+    mountPath: /opt/extra-lib
+
+
+in program set
+# PYTHONPATH="$PYTHONPATH:$PYTHONLIB"
+# JAVA_HOME="/opt/jdk/openjdk-17"
+
+
+All shareable folders will be accessible in edge nodes
+
+# from edge node we can directly install python libraries
+pip install package_name -t $PYTHONPATH --no-user
+
+can directly copy jars in /opt/extra-lib
+can directly copy airflow dag in /opt/airflow/dags

@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-db-init
+  namespace: udh-pipeline
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: init-db-and-admin
+          image: apache/airflow:2.8.1-python3.10
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "Initializing Airflow DB..."
+              airflow db init
+              echo "Creating Admin User..."
+              airflow users create \
+                --username admin \
+                --firstname Admin \
+                --lastname User \
+                --role Admin \
+                --email admin@example.com \
+                --password admin123
+              echo "Done."
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              value: mysql+mysqldb://airflowuser:airflowpass@mysql/airflowdb
+

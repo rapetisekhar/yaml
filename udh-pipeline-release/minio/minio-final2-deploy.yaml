@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: udh-pipeline
+spec:
+  type: ClusterIP
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+    - name: console
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-svc
+  namespace: udh-pipeline
+  labels:
+    app: minio
+spec:
+  selector:
+    app: minio
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-nodeport
+  namespace: udh-pipeline
+spec:
+  selector:
+    app: minio
+  type: NodePort
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+      nodePort: 31000
+      protocol: TCP
+    - name: console
+      port: 9090
+      targetPort: 9090
+      nodePort: 31001
+      protocol: TCP
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: udh-pipeline
+  labels:
+    app: minio
+spec:
+  serviceName: "minio-svc"
+  replicas: 4
+  podManagementPolicy: "Parallel"
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: quay.io/minio/minio:latest
+        args:
+        - server
+        - http://minio-{0...3}.minio-svc.udh-pipeline.svc.cluster.local/data1
+        - --console-address
+        - ":9090"
+        envFrom:
+        - secretRef:
+            name: minio-credentials
+        ports:
+        - containerPort: 9000
+          name: api
+          protocol: TCP
+        - containerPort: 9090
+          name: console
+          protocol: TCP
+        volumeMounts:
+        - name: minio-data
+          mountPath: /data1
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /minio/health/live
+            port: api
+            scheme: HTTP
+          initialDelaySeconds: 120
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 10
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: "longhorn"
+
