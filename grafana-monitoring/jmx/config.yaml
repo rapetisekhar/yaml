@@ -1,0 +1,6 @@
+startDelaySeconds: 0
+hostPort: localhost:8080
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+rules:
+  - pattern: ".*"
